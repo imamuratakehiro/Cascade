@@ -1,0 +1,232 @@
+
+# hyper parameter
+n_epoch: 400
+#inst: drums
+#inst: bass
+#inst: piano
+inst: guitar
+#inst: residuals
+#inst_list: ['drums']
+#inst_list: ['bass']
+#inst_list: ['piano']
+inst_list: ['guitar']
+#inst_list: ['residuals']
+inst_all: ['drums', 'bass', 'piano', 'guitar', 'residuals']
+#lr: 0.00005
+#lr: 0.00001
+lr: 0.001
+
+# data
+dataset_dir: ???
+#pseudo: "31ways"
+pseudo: "b_4t_inst"
+n_triplet_train: 20000
+n_triplet_valid: 2000
+n_dataset_test: 1000
+n_song_psd: 10
+batch_train: 64
+batch_test: 64
+num_workers: 8
+pin_memory: False
+all_diff: False
+
+datasetname: "slakh"
+load_using_librosa: True
+mix_minus_inst: False
+test_psd_mine: False
+test_valid_norm: false
+triplet_not_list: True
+normalize_unet: false
+standardize_unet: False
+normalize_featurenet: false
+standardize_featurenet: True
+unet_required_grad: False
+#unet_required_grad: True
+featurenet_required_grad: True
+self_att: False
+#bpm: True
+bpm: False
+# positional embedding based on BPM
+pe_bpm_len: 1
+#add_bpm: True
+add_bpm: False
+bpm_min: 60
+bpm_max: 200
+#q_dim: 10
+d_ff: 512
+#d_ff: 1024
+#d_ff: 2048
+#d_ff: 4096
+#heads_num: 5
+#heads_num: 4
+heads_num: 8
+n_encoder_layer: 6
+
+
+complex: False
+complex_unet: False
+complex_featurenet: False
+#complex_featurenet: True
+wave_featurenet: False
+mel_unet: False
+mel_featurenet: True
+#mel_featurenet: False
+n_mels: 259
+#n_mels: 256
+#n_mels: 512
+db_featurenet: True
+#chroma_featurenet: True
+chroma_featurenet: False
+#pitch_shift: False
+pitch_shift: False
+n_shift: 2
+#time_stretch: True
+time_stretch: False
+stretch_rate: 0.2
+#db_featurenet: False
+mono: True
+f_size: 2048
+#f_size: 1024
+#f_size: 4096
+hop_length: 512
+#hop_length: 2048
+# psd
+#seconds_psd_train: 3
+seconds_psd_train: 10
+seconds_psd_valid: 10
+seconds_psd_test: 10
+#offset_psd_train: 1.5
+#offset_psd_train: 3.0
+offset_psd_train: 10.0
+offset_psd_valid: 10.0
+offset_psd_test: 10.0
+# not_psd
+n_song_test: 50
+n_song_valid: 50
+not_psd_all: False # validのみ。testは常時全部
+not_psd_no_silence_stem: True
+#seconds_not_psd_train: 3
+seconds_not_psd_train: 10
+seconds_not_psd_valid: 10
+seconds_not_psd_test: 10
+#offset_psd_train: 1.5
+#offset_not_psd_train: 3.0
+offset_not_psd_train: 10.0
+#offset_psd_valid: 5.0
+offset_not_psd_valid: 10.0
+offset_not_psd_test: 10.0
+# triplet
+#seconds_triplet_train: 3
+seconds_triplet_train: 5
+#seconds_triplet_train: 5
+#seconds_triplet_valid: 3
+seconds_triplet_valid: 5
+#seconds_triplet_valid: 5
+seconds_triplet_test: 10
+#offset_triplet_train: 1.5
+#offset_triplet_train: 3.0
+offset_triplet_train: 5.0
+#offset_triplet_train: 5.0
+#offset_triplet_valid: 1.5
+#offset_triplet_valid: 3.0
+offset_triplet_valid: 5.0
+#offset_triplet_valid: 5.0
+offset_triplet_test: 10.0
+# c32
+seconds_c32_train: 3
+seconds_c32_valid: 10
+seconds_c32_test: 10
+offset_c32_train: 1.5
+offset_c32_valid: 10.0
+offset_c32_test: 10.0
+sr: 44100
+# for abx zume 2024
+human_per_data: 3
+threshold: 1
+precise: True
+calc_habx: True
+eval2score:
+  A+: 2
+  A-: 2
+  B-: -2
+  B+: -2
+
+# model
+pl_target: model.NNet
+target_unet: model.UNet
+#target_featurenet: model.JNet128Embnet
+#target_featurenet: model.JNetCrossMLP
+target_featurenet: model.JNetSAPMLP
+#target_featurenet: model.TransformerSAPMLP
+#target_featurenet: model.ConvTransformerSAPMLP
+#target_featurenet: model.TransformerCLSMLP
+#target_featurenet: model.WaveTransformerSAPMLP
+#target_featurenet: model.ConvTransformerSAPMLPEvery
+#target_featurenet: model.TransformerWithBPM
+to1d_mode: "mean_linear"
+order: "timefreq"
+#order: "freqtime"
+#order: "bilstm"
+margin: 0.2
+# monitor
+#monitor_es: "Valid/knn_psd_avr"
+monitor_es: "Valid/loss_all"
+#monitor_es: "Valid/knn_avr"
+#monitor_mode_es: "max"
+monitor_mode_es: "min"
+#monitor_sch: "train/loss_all"
+monitor_mode_sch: "min"
+
+# rate of loss
+unet_rate: 0
+triplet_rate: 1
+recog_rate: 0
+
+# pretrain unet
+# drums unet=psd
+#ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2023-12-18/07-44-42/checkpoints/epoch_342.ckpt
+# bass unet=psd
+#ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2023-12-18/07-14-24/checkpoints/epoch_339.ckpt
+# piano unet=not_psd
+#ckpt_model_path_unet: /nas02/homes/imamura23-1000067/outputs/unet/runs/2023-12-10/18-07-54/checkpoints/epoch_398.ckpt
+# piano unet=psd
+#ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2023-12-17/04-42-20/checkpoints/epoch_312.ckpt
+# guitar unet=psd
+ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2023-12-18/07-43-50/checkpoints/epoch_330.ckpt
+# residuals unet=psd
+#ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2024-01-07/10-08-08/checkpoints/last.ckpt
+
+# train triplet (second) lr=1e-3
+# bass unet=psd, triplet=psd
+#ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2023-12-23/00-31-57/checkpoints/epoch_040.ckpt
+#ckpt_model_path_featurenet: /home/imamura23/nas02home/outputs/nnet/runs/2023-12-23/00-31-57/checkpoints/epoch_040.ckpt
+# piano unet=psd, triplet=psd
+#ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2023-12-23/23-06-41/checkpoints/epoch_062.ckpt
+#ckpt_model_path_featurenet: /home/imamura23/nas02home/outputs/nnet/runs/2023-12-23/23-06-41/checkpoints/epoch_062.ckpt
+# guitar unet=psd, triplet=psd
+#ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2023-12-23/00-27-28/checkpoints/epoch_082.ckpt
+#ckpt_model_path_featurenet: /home/imamura23/nas02home/outputs/nnet/runs/2023-12-23/00-27-28/checkpoints/epoch_082.ckpt
+# guitar unet=psd, triplet=psd, net=transformer_3s
+#ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2023-12-29/08-48-34/checkpoints/epoch_060.ckpt
+#ckpt_model_path_featurenet: /home/imamura23/nas02home/outputs/nnet/runs/2023-12-29/08-48-34/checkpoints/epoch_060.ckpt
+
+# second lr=5e-5
+# drums unet=psd triplet=psd
+#ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2024-03-30/23-22-53/checkpoints/epoch_128.ckpt
+#ckpt_model_path_featurenet: /home/imamura23/nas02home/outputs/nnet/runs/2024-03-30/23-22-53/checkpoints/epoch_128.ckpt
+# bass unet=psd triplet=psd
+#ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2024-03-29/23-44-34/checkpoints/epoch_233.ckpt
+#ckpt_model_path_featurenet: /home/imamura23/nas02home/outputs/nnet/runs/2024-03-29/23-44-34/checkpoints/epoch_233.ckpt
+# piano unet=psd triplet=psd
+#ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2024-03-30/23-25-39/checkpoints/epoch_139.ckpt
+#ckpt_model_path_featurenet: /home/imamura23/nas02home/outputs/nnet/runs/2024-03-30/23-25-39/checkpoints/epoch_139.ckpt
+# guitar unet=psd triplet=psd
+#ckpt_model_path_unet: /home/imamura23/nas02home/outputs/nnet/runs/2024-03-30/23-30-12/checkpoints/epoch_084.ckpt
+#ckpt_model_path_featurenet: /home/imamura23/nas02home/outputs/nnet/runs/2024-03-30/23-30-12/checkpoints/epoch_084.ckpt
+
+#ckpt_model_path_unet: null
+ckpt_model_path_featurenet: null
+
+# path
+output_dir: ${paths.output_dir}
+metadata_dir: ${paths.metadata_dir}
