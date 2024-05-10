@@ -1,5 +1,5 @@
 <p style="display: inline">
-  <img alt="Static Badge" src="https://img.shields.io/badge/python-3.10.9_yellow">
+  <img alt="Static Badge" src="https://img.shields.io/badge/python-3.10.9-yellow">
 </p>
 
 # Cascade
