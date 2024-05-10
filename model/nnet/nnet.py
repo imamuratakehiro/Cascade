@@ -8,23 +8,16 @@ from torch.nn import ModuleList as MList, ModuleDict as MDict
 from pytorch_lightning import LightningModule
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.classification.accuracy import BinaryAccuracy
-#from sklearn.manifold import TSNE
-#from sklearn.neighbors import KNeighborsClassifier
-#from sklearn import metrics
 import soundfile
 import numpy as np
-#import matplotlib.pyplot as plt
-#import matplotlib.cm as cm
-#from matplotlib.colors import ListedColormap, BoundaryNorm
 import random
 import pandas as pd
 import museval
 import json
 
-from utils.func import file_exist, knn_psd, tsne_psd, istft, tsne_psd_marker, TorchSTFT, tsne_not_psd
+from utils.func import file_exist, knn_psd, tsne_psd, tsne_psd_marker, TorchSTFT, tsne_not_psd
 from ..csn import ConditionalSimNet1d
 from ..tripletnet import CS_Tripletnet
-
 
 class NNet(LightningModule):
     """Example of a `LightningModule` for MNIST classification.
@@ -123,31 +116,6 @@ class NNet(LightningModule):
         self.loss_mrl     = nn.MarginRankingLoss(margin=cfg.margin, reduction="mean") #バッチ平均
         self.loss_cross_entropy = nn.BCEWithLogitsLoss(reduction="mean")
 
-        # metric objects for calculating and averaging accuracy across batches
-        #self.train_acc = Accuracy(task="multiclass", num_classes=10)
-        #self.val_acc = Accuracy(task="multiclass", num_classes=10)
-        #self.test_acc = Accuracy(task="multiclass", num_classes=10)
-
-        # for averaging loss across batches
-        """
-        self.song_type = ["anchor", "positive", "negative", "cases", "all"]
-        # train
-        self.train_loss = MeanMetric()
-        self.val_loss   = MeanMetric()
-        self.train_loss_unet = {type: MeanMetric() for type in self.song_type}
-        self.train_loss_triplet = {inst: MeanMetric() for inst in cfg.inst_list}
-        self.train_loss_recog = MeanMetric()
-        self.train_recog_acc = {inst: Accuracy for inst in cfg.inst_list}
-        self.train_dist_p = {inst: MeanMetric() for inst in cfg.inst_list}
-        self.train_dist_n = {inst: MeanMetric() for inst in cfg.inst_list}
-        # validate
-        self.valid_loss_unet = {type: MeanMetric() for type in self.song_type}
-        self.valid_loss_triplet = {inst: MeanMetric() for inst in cfg.inst_list}
-        self.valid_loss_recog = MeanMetric()
-        self.valid_recog_acc = {inst: Accuracy for inst in cfg.inst_list}
-        self.valid_dist_p = {inst: MeanMetric() for inst in cfg.inst_list}
-        self.valid_dist_n = {inst: MeanMetric() for inst in cfg.inst_list}
-        """
         self.song_type = ["anchor", "positive", "negative"]
         self.sep_eval_type = ["sdr", "sir", "isr", "sar"]
         self.recorder = MDict({})
@@ -197,10 +165,6 @@ class NNet(LightningModule):
                         "recog_acc": MeanMetric()
                         #"recog_acc": []
                         })
-        #self.result_abx = {s: {inst: {m: {c: {"recog_acc": []} for c in self.category_abx} for m in self.mode_abx} for inst in cfg.inst_list} for s in ["Valid", "Test"]}
-
-        # for tracking best so far validation accuracy
-        #self.val_acc_best = MaxMetric()
         self.stft = TorchSTFT(cfg=cfg)
         if cfg.time_stretch:
             self.time_strecher = torchaudio.transforms.TimeStretch(hop_length=cfg.hop_length, n_freq=cfg.f_size//2+1)
@@ -210,9 +174,6 @@ class NNet(LightningModule):
         """Lightning hook that is called when training begins."""
         # by default lightning executes validation step sanity checks before training starts,
         # so it's worth to make sure validation metrics don't store results from these checks
-        #self.val_loss.reset()
-        #self.val_acc.reset()
-        #self.val_acc_best.reset()
         self.recorder["Valid"]["loss_all"].reset()
         for type in self.song_type:
             self.recorder["Valid"]["loss_unet"][type].reset()
@@ -225,32 +186,10 @@ class NNet(LightningModule):
             self.recorder["Valid"]["dist_n"][inst].reset()
         self.recorder["Valid"]["loss_triplet"]["all"].reset()
         for step in ["Valid", "Test"]:
-            #self.result_abx[step] = MDict({})
             for inst in self.cfg.inst_list:
-                #self.result_abx[step][inst] = MDict({})
                 for mode in self.mode_abx:
-                    #self.result_abx[step][inst][mode] = MDict({})
                     for c in self.category_abx:
                         self.result_abx[step][inst][mode][c]["recog_acc"].reset()
-    """
-    def dataload_triplet(self, batch):
-        # データセットを学習部分と教師部分に分けてdeviceを設定
-        #self.logger.s_dataload()
-        #print(f"\t..................dataset log.......................")
-        anchor_X, anchor_y, positive_X, positive_y, negative_X, negative_y, triposi, posiposi = batch
-        anchor_y   = torch.permute(anchor_y,   (1, 0, 2, 3, 4))
-        positive_y = torch.permute(positive_y, (1, 0, 2, 3, 4))
-        negative_y = torch.permute(negative_y, (1, 0, 2, 3, 4))
-        #print(f"\t....................................................")
-        #self.logger.f_dataload()
-        return anchor_X, anchor_y, positive_X, positive_y, negative_X, negative_y, triposi, posiposi
-    
-    def dataload_32cases(self, cases32_loader):
-        # 32situationをロード
-        cases_X, cases_y, cases = cases32_loader.load()
-        cases_y = torch.permute(cases_y, (1, 0, 2, 3, 4))
-        return cases_X, cases_y, cases
-    """
     
     def get_loss_unet(self, X, y, pred_mask):
         batch = X.shape[0]
@@ -265,48 +204,12 @@ class NNet(LightningModule):
         batch = y.shape[0]
         loss = 0
         for idx, c in enumerate(triposi): #個別音源でロスを計算
-            #if len(self.cfg.inst_list) == 1:
-            #    loss += self.loss_unet(pred[self.cfg.inst_all[c.item()]][idx], y[idx, 0])
-            #else:
             if y.shape[1] == 1:
                 loss += self.loss_unet(pred[self.cfg.inst_all[c.item()]][idx], y[idx])
             else:
                 loss += self.loss_unet(pred[self.cfg.inst_all[c.item()]][idx], y[idx, c])
         return loss / batch
-    
-    """
-    def get_loss_triplet(self, e_a, e_p, e_n, triposi):
-        batch = triposi.shape[0]
-        loss_all = 0
-        loss = {inst: 0 for inst in self.cfg.inst_list}
-        dist_p_all = {inst: 0 for inst in self.cfg.inst_list}
-        dist_n_all = {inst: 0 for inst in self.cfg.inst_list}
-        csn = ConditionalSimNet1d(batch=1)
-        inst_n_triplet = [0 for i in range(len(self.cfg.inst_list))]
-        for b, i in enumerate(triposi):
-            condition = self.cfg.inst_list[i.item()]
-            masked_e_a = csn(e_a[b], torch.tensor([i], device=e_a.device))
-            masked_e_p = csn(e_p[b], torch.tensor([i], device=e_p.device))
-            masked_e_n = csn(e_n[b], torch.tensor([i], device=e_n.device))
-            dist_p = F.pairwise_distance(masked_e_a, masked_e_p, 2)
-            dist_n = F.pairwise_distance(masked_e_a, masked_e_n, 2)
-            target = torch.ones_like(dist_p).to(dist_p.device) #1で埋める
-            # トリプレットロス
-            triplet = self.loss_triplet(dist_n, dist_p, target) #3つのshapeを同じにする
-            loss[condition] += triplet.item()
-            loss_all += triplet
-            dist_p_all[condition] += dist_p.item()
-            dist_n_all[condition] += dist_n.item()
-            inst_n_triplet[i] += 1
-        # lossを出現回数で割って平均の値に
-        for i in range(len(self.cfg.inst_list)):
-            condition = self.cfg.inst_list[i]
-            if inst_n_triplet[i] != 0:
-                loss[condition] /= inst_n_triplet[i]
-                dist_p_all[condition] /= inst_n_triplet[i]
-                dist_n_all[condition] /= inst_n_triplet[i]
-        return loss_all/batch, loss, dist_p_all, dist_n_all
-    """
+
     def get_loss_triplet(self, e_a, e_p, e_n, triposi):
         #batch = triposi.shape[0]
         if len(self.cfg.inst_list) == 1:
@@ -315,7 +218,6 @@ class NNet(LightningModule):
         else:
             tnet = CS_Tripletnet(ConditionalSimNet1d().to(e_a.device))
             distp, distn = tnet(e_a, e_p, e_n, triposi)
-        #print(distp.shape, distn.shape)
         if self.cfg.all_diff:
             # 出力結果の小さい方をpositive, 大きい方をnegativeと定義
             small_dist = torch.where(distp < distn, distp, distn)
@@ -334,8 +236,6 @@ class NNet(LightningModule):
     def get_loss_recognise1(self, emb, cases, l = 1e5):
         batch = len(cases)
         loss_emb = 0
-        #zero = torch.tensor(0).to(device)
-        #one  = torch.tensor(1).to(device)
         for b in range(batch):
             for inst in emb.keys():
                 c = self.cfg.inst_all.index(inst)
@@ -345,10 +245,8 @@ class NNet(LightningModule):
                     target = torch.ones_like(dist_0).to(cases.device) #1で埋める
                     # 0ベクトルとembedded vectorの距離がmarginよりも大きくなることを期待
                     loss_emb += self.loss_mrl(dist_0, torch.zeros_like(dist_0, device=cases.device), target)
-                    #loss_emb_zero += self.loss_fn(torch.mean(torch.abs(emb[inst][b])), one)
                 else:
                     loss_emb += self.loss_l2(emb[inst][b], torch.zeros_like(emb[inst][b], device=cases.device))
-        #batch = X.shape[0]
         return loss_emb / batch # バッチ平均をとる
 
     def get_loss_recognise2(self, probability, cases):
@@ -381,10 +279,6 @@ class NNet(LightningModule):
             return self.time_strecher(complex_spec, rate)
         else:
             return complex_spec
-    
-    #def filtering(self, spec, train: bool):
-    #    if train and self.cfg.da_filtering:
-
     
     def transform_for_featurenet(self, train, **kwargs):
         if self.cfg.wave_featurenet:
@@ -436,33 +330,6 @@ class NNet(LightningModule):
             if self.cfg.chroma_featurenet:
                 x = torch.concat([x, chroma], dim=2)
             return x
-    
-    """def clone_for_additional(self, a_x, a_y, p_x, p_y, n_x, n_y, s_a, s_p, s_n, triposi):
-        if triposi.dim() == 2: # [b, a]で入ってる
-            x_a, x_p, x_n, y_a, y_p, y_n, a_s, p_s, n_s, tp = [], [], [], [], [], [], [], [], [], []
-            for i, ba in enumerate(triposi):
-                # basic
-                x_a.append(a_x[i].clone()); x_p.append(p_x[i].clone()); x_n.append(n_x[i].clone())
-                y_a.append(a_y[i].clone()); y_p.append(p_y[i].clone()); y_n.append(n_y[i].clone())
-                a_s.append(s_a[i]); p_s.append(s_p[i]); n_s.append(s_n[i]); tp.append(ba[0])
-                #print(ba[1].item(), type(ba[1].item()),  ba[1].item() == -1)
-                if not ba[1].item() == -1:
-                    # additional
-                    x_a.append(a_x[i].clone()); x_p.append(n_x[i].clone()); x_n.append(p_x[i].clone())
-                    y_a.append(a_y[i].clone()); y_p.append(n_y[i].clone()); y_n.append(p_y[i].clone())
-                    a_s.append(s_a[i]); p_s.append(s_n[i]); n_s.append(s_p[i]); tp.append(ba[1])
-            return (torch.stack(x_a, dim=0),
-                    torch.stack(y_a, dim=0),
-                    torch.stack(x_p, dim=0),
-                    torch.stack(y_p, dim=0),
-                    torch.stack(x_n, dim=0),
-                    torch.stack(y_n, dim=0),
-                    torch.stack(a_s, dim=0),
-                    torch.stack(p_s, dim=0),
-                    torch.stack(n_s, dim=0),
-                    torch.stack(tp, dim=0))
-        else:
-            return a_x, a_y, p_x, p_y, n_x, n_y, s_a, s_p, s_n, triposi"""
 
     def forward(self, batch):
         """Perform a single model step on a batch of data.
@@ -474,7 +341,6 @@ class NNet(LightningModule):
             - A tensor of predictions.
             - A tensor of target labels.
         """
-        #a_x, a_y, p_x, p_y, n_x, n_y, triposi, posiposi = self.dataload_tripet(batch)
         (a_x_wave, a_y_wave, p_x_wave, p_y_wave, n_x_wave, n_y_wave,
         sound_a, sound_p, sound_n,
         bpm_a, bpm_p, bpm_n, triposi) = batch
@@ -483,7 +349,6 @@ class NNet(LightningModule):
             a_x = self.transform_for_unet(a_x_wave); a_y = self.transform_for_unet(a_y_wave)
             p_x = self.transform_for_unet(p_x_wave); p_y = self.transform_for_unet(p_y_wave)
             n_x = self.transform_for_unet(n_x_wave); n_y = self.transform_for_unet(n_y_wave)
-        #a_x, a_y, p_x, p_y, n_x, n_y, sound_a, sound_p, sound_n, triposi = self.clone_for_additional(a_x, a_y, p_x, p_y, n_x, n_y, sound_a, sound_p, sound_n, triposi)
         if self.cfg.pseudo == "ba_4t":
             triposi = triposi[:, 0] # basicに変換
         a_x["unet_out"] = self.unet(a_x["spec"])
@@ -564,49 +429,6 @@ class NNet(LightningModule):
         # return loss or backpropagation will fail
         return loss_all
     
-    """def model_step_psd(self, mode:str, batch, idx):
-        ID, ver, seg, data_psd_wave, data_not_psd_wave, c = batch
-        with torch.no_grad():
-            data_psd = self.transform_for_unet(data_psd_wave)
-            data_not_psd = self.transform_for_unet(data_not_psd_wave)
-        data_psd["unet_out"] = self.unet(data_psd["spec"])
-        data_not_psd["unet_out"] = self.unet(data_not_psd["spec"])
-        pred_psd = self.transform_for_featurenet(**data_psd)
-        pred_not_psd = self.transform_for_featurenet(**data_not_psd)
-        embvec_psd, _ = self.featurenet(pred_psd)
-        embvec_not_psd, _ = self.featurenet(pred_not_psd)
-        #embvec, _, _ = self.net(data)
-        if self.cfg.test_valid_norm:
-            embvec_psd = torch.nn.functional.normalize(embvec_psd, dim=1)
-            embvec_not_psd = torch.nn.functional.normalize(embvec_not_psd, dim=1)
-        if len(self.cfg.inst_list) == 1:
-            self.recorder_psd[mode]["label"][self.cfg.inst].append(torch.stack([ID, ver], dim=1))
-            self.recorder_psd[mode]["vec_psd"][self.cfg.inst].append(embvec_psd)
-            self.recorder_psd[mode]["vec_not_psd"][self.cfg.inst].append(embvec_not_psd)
-        else:
-            csn_valid = ConditionalSimNet1d().to(embvec_psd.device)
-            self.recorder_psd[mode]["label"][self.cfg.inst_list[idx]].append(torch.stack([ID, ver], dim=1))
-            self.recorder_psd[mode]["vec_psd"][self.cfg.inst_list[idx]].append(csn_valid(embvec_psd, c))
-            self.recorder_psd[mode]["vec_not_psd"][self.cfg.inst_list[idx]].append(csn_valid(embvec_not_psd, c))
-        if self.n_sound < 5:
-            for inst in self.cfg.inst_list:
-                if self.cfg.complex_unet:
-                    z_psd = self.stft.spec2complex(data_psd["unet_out"][inst][5])
-                    z_not_psd = self.stft.spec2complex(data_not_psd["unet_out"][inst][5])
-                else:
-                    z_psd = data_psd["unet_out"][inst][0] * data_psd["phase"][0]
-                    z_not_psd = data_not_psd["unet_out"][inst][0] * data_not_psd["phase"][0]
-                sound_psd = self.stft.istft(z_psd)
-                sound_not_psd = self.stft.istft(z_not_psd)
-                path = self.cfg.output_dir+f"/sound/{inst}/valid_e={self.current_epoch}"
-                file_exist(path + "/psd")
-                soundfile.write(path + f"/psd/separate{self.n_sound}_{inst}.wav", np.squeeze(sound_psd.to("cpu").numpy()), self.cfg.sr)
-                file_exist(path + "/not_psd")
-                soundfile.write(path + f"/not_psd/separate{self.n_sound}_{inst}.wav", np.squeeze(sound_not_psd.to("cpu").numpy()), self.cfg.sr)
-                soundfile.write(path + f"/psd/mix{self.n_sound}_{inst}.wav", np.squeeze(data_psd_wave[0].to("cpu").numpy()), self.cfg.sr)
-                soundfile.write(path + f"/not_psd/mix{self.n_sound}_{inst}.wav", np.squeeze(data_not_psd_wave[0].to("cpu").numpy()), self.cfg.sr)
-                self.n_sound += 1"""
-    
     def model_step_knn_tsne(self, mode:str, batch, idx, psd: str):
         ID, ver, seg, data_wave, bpm, c = batch
         with torch.no_grad():
@@ -671,7 +493,6 @@ class NNet(LightningModule):
         dist_XA = torch.norm(emb_x - emb_a, dim=1, keepdim=True)
         dist_XB = torch.norm(emb_x - emb_b, dim=1, keepdim=True)
         idnt = torch.unsqueeze(idnt, dim=-1)
-        #result = np.where(dist_XA.to("cpu").numpy() > dist_XB.to("cpu").numpy(), "B", "A")
         if mode == "Test":
             self.abx_csv[inst].append(torch.concat([idnt, dist_XA, dist_XB], dim=1))
 
@@ -697,14 +518,6 @@ class NNet(LightningModule):
             def score_list(evals, eval2score):
                 score = 0
                 for eval in evals:
-                    """if eval == "A+":
-                        score += 2
-                    elif eval == "A-":
-                        score += 1
-                    elif eval == "B-":
-                        score += -1
-                    elif eval == "B+":
-                        score += -2"""
                     score += eval2score[eval]
                 return score / len(evals)
             scores = {
@@ -731,15 +544,7 @@ class NNet(LightningModule):
                 return True
             else:
                 return False
-        #human_abx = json.load(open(self.cfg.metadata_dir + f"zume/abx_2024/results_modified.json", 'r'))
-        #path = {}
-        #model_abx = {}
-        #category = ["results_melody", "results_rhythm", "results_timbre", "results_total"]
-        #mode = ["XAB", "XYC"]
-        #result = {inst: {m: {c: {"score": [], "all": 0} for c in category} for m in mode} for inst in self.cfg.inst_list}
-        #model_abx[inst] = pd.read_csv(path[inst]).values
         for i, idnt_per in enumerate(idnt):
-        #for mabx_row in model_abx[inst]:
             habx = self.human_abx[f"{int(idnt_per):0=5}"]
             mabx_scores = "A" if dist_XA[i] < dist_XB[i] else "B"
             if self.cfg.calc_habx:
@@ -748,16 +553,9 @@ class NNet(LightningModule):
                     if habx_scores[c] == -100:
                         continue
                     if habx_scores[c] == mabx_scores:
-                        #result[inst][habx["mode"]][c]["score"].append(1)
-                        #print(1, habx["mode"])
                         self.result_abx[mode][inst][habx["mode"]][c]["recog_acc"](1)
-                        #self.result_abx[mode][inst][habx["mode"]][c]["recog_acc"].append(1)
                     else:
-                        #result[inst][habx["mode"]][c]["score"].append(0)
-                        #print(0)
                         self.result_abx[mode][inst][habx["mode"]][c]["recog_acc"](0)
-                        #self.result_abx[mode][inst][habx["mode"]][c]["recog_acc"].append(0)
-                    #result[inst][habx["mode"]][c]["all"] += 1
             else:
                 for c in self.category_abx:
                     habx_scores = remove_nan(habx[c])
@@ -766,17 +564,9 @@ class NNet(LightningModule):
                     habx_scores = remove_plus_minus(habx_scores)
                     for h in habx_scores:
                         if h == mabx_scores:
-                            #result[inst][habx["mode"]][c]["score"].append(1)
                             self.result_abx[mode][inst][habx["mode"]][c]["recog_acc"](1)
                         else:
-                            #result[inst][habx["mode"]][c]["score"].append(0)
                             self.result_abx[mode][inst][habx["mode"]][c]["recog_acc"](0)
-                        #result[inst][habx["mode"]][c]["all"] += 1
-        #print(dist_XA, dist_XB)
-        #recommend = "1" if dist_s1 < dist_s2 else "2"
-        #print(inst)
-        #print(self.result_abx[mode][inst]["XAB"][c]["recog_acc"].compute())
-        #print(self.result_abx[mode][inst]["XYC"][c]["recog_acc"].compute())
         for m_abx in self.mode_abx:
             for c in self.category_abx:
                 self.log(f"{mode}/abx_recog_acc_{m_abx}_{c}", self.result_abx[mode][inst][m_abx][c]["recog_acc"], on_step=False, on_epoch=True, prog_bar=False, add_dataloader_idx=False)
@@ -882,19 +672,10 @@ class NNet(LightningModule):
             for m_abx in self.mode_abx:
                 print(f"  {m_abx}")
                 for c in self.category_abx:
-                    #score = self.result_abx[mode][inst][m_abx][c]["recog_acc"].compute()
                     print(f"    {c}: {self.result_abx[mode][inst][m_abx][c]['recog_acc'].compute()*100:.2f} %")
-                    #print(self.result_abx[mode][inst][m_abx][c]['recog_acc'].compute())
-                    #print(f"    {c}: {np.mean(self.result_abx[mode][inst][m_abx][c]['recog_acc'])} %")
 
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
-        #acc = self.val_acc.compute()  # get current val acc
-        #self.val_acc_best(acc)  # update best so far val acc
-        # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
-        # otherwise metric would be reset by lightning after each epoch
-        #self.log("val/acc_best", self.val_acc_best.compute(), sync_dist=True, prog_bar=True)
-        # abx_2024
         self.calc_abx_scores(mode="Valid")
 
         self.print_loss("Valid")
@@ -903,13 +684,11 @@ class NNet(LightningModule):
         self.knn_tsne("Valid", psd="psd_mine")
         for psd in ["psd", "not_psd", "psd_mine"]:
             self.n_sound["Valid"][psd] = {inst: 0 for inst in self.cfg.inst_list}
-        #self.result_abx = {s: {inst: {m: {c: {"recog_acc": []} for c in self.category_abx} for m in self.mode_abx} for inst in self.cfg.inst_list} for s in ["Valid", "Test"]}
 
     def evaluate_separated(self, reference, estimate):
         # assume mix as estimates
         B_r, S_r, T_r = reference.shape
         B_e, S_e, T_e = estimate.shape
-        #print(T_e, T_r)
         reference = torch.reshape(reference, (B_r, T_r, S_r))
         estimate  = torch.reshape(estimate, (B_e, T_e, S_e))
         if T_r > T_e:
@@ -919,12 +698,8 @@ class NNet(LightningModule):
         # Evaluate using museval
         score = museval.evaluate(references=reference.to("cpu"), estimates=estimate.to("cpu"))
         print(len(score))
-        #print(score)
         for i,key in enumerate(list(scores.keys())):
-            #print(score[i].shape)
             scores[key] = np.mean(score[i])
-        # print nicely formatted and aggregated scores
-        #sdr="SDR"; isr="ISR"; sir="SIR"; sar="SAR"
         return scores
 
     def test_step(self, batch, batch_idx: int, dataloader_idx=0) -> None:
@@ -960,7 +735,6 @@ class NNet(LightningModule):
                     if c[idx_inst] == 1:
                         #    and self.n_sound < 5):
                         #sound = self.stft.detransform(cases_x[idx], phase[idx], param[0,idx], param[1,idx])
-                        # TODO: complex = TrueだとphaseがNoneでidxがないって怒られるからそこを直す！いっそモデルの中で波にしちゃうのあり？てかそのロス追加する？
                         #if self.cfg.complex:
                         #    sound = self.stft.detransform(cases_x[idx])
                         #else:
@@ -1007,9 +781,6 @@ class NNet(LightningModule):
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
         print()
-        #for inst in self.cfg.inst_list:
-        #    recog_acc = self.recorder["Test"]["recog_acc"][inst].compute()
-        #    print(f"Test average accuracy {inst:9} : {recog_acc*100: 2f} %")
         for inst in self.cfg.inst_list:
             for s in self.sep_eval_type:
                 print(f"{s} {inst:9}: {self.recorder_psd['Test']['sep'][s][inst].compute()}")
@@ -1032,8 +803,6 @@ class NNet(LightningModule):
 
         :param stage: Either `"fit"`, `"validate"`, `"test"`, or `"predict"`.
         """
-        # if self.hparams.compile and stage == "fit":
-        #    self.net = torch.compile(self.net)
         pass
 
     def configure_optimizers(self) -> Dict[str, Any]:
@@ -1059,8 +828,6 @@ class NNet(LightningModule):
                 },
             }
         return {"optimizer": optimizer}
-        
-        #return torch.optim.Adam(self.trainer.model.parameters(), lr=self.cfg.lr)
 
 
 if __name__ == "__main__":

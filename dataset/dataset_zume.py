@@ -83,7 +83,6 @@ class ReturnBPM:
         self.bpm_list = pd.read_csv(cfg.metadata_dir + "slakh/tempo2100mix.csv").values
     
     def __call__(self, track_id) -> Any:
-        #print(self.bpm_list[track_id - 1], track_id)
         return self.bpm_list[track_id - 1, 1]
 
 def loadseg_from_npz(path):

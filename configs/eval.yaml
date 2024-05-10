@@ -11,14 +11,8 @@ defaults:
   - extras: default
   - hydra: default
   - experiment: nnet/w
-  #- experiment: nnet/x
-  #- experiment: nnet/z
-  #- experiment: nnet_mix/z
-  #- override hydra/job_logging: colorlog
-  #- override hydra/hydra_logging: colorlog
 
-task_name: eval_nnet
-#task_name: eval_nnet_mix
+task_name: ???
 
 tags: ["dev"]
 

@@ -3,17 +3,13 @@ import torch.nn.functional as F
 import torchaudio
 import torchaudio.functional as Fa
 import time
-#import librosa.core as lc
 import librosa
 import os
 import museval
 import numpy as np
-#from torchmetrics.audio import SignalDistortionRatio as SDR, ScaleInvariantSignalDistortionRatio as SISDR
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
-#import matplotlib.cm as cm
-#import dask.array as da
 
 # GPUが使用可能かどうか判定、使用可能なら使用する
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -133,7 +129,6 @@ def complex_norm(
 
     # Replace by torch.norm once issue is fixed
     # https://github.com/pytorch/pytorch/issues/34279
-    #out = torch.view_as_real(complex_tensor).pow(2.).sum(-1).pow(0.5 * power)
     out = torch.view_as_real(complex_tensor).pow(2.).sum(-1).pow(power)
     return out
 
@@ -148,9 +143,7 @@ def angle(
     Return:
         Tensor: Angle of a complex tensor. Shape of `(..., )`
     """
-    #real = torch.view_as_real(complex_tensor)
     return torch.atan2(complex_tensor[..., 1], complex_tensor[..., 0])
-    #return complex_tensor.angle()
 
 def magphase_torch(
         complex_tensor,
@@ -165,7 +158,6 @@ def magphase_torch(
     Returns:
         (Tensor, Tensor): The magnitude and phase of the complex tensor
     """
-    #mag = complex_norm(complex_tensor, power)
     mag = torch.abs(complex_tensor)
     zeros_to_ones = torch.where(mag == 0, 1.0, 0.0)
     mag_nonzero = mag + zeros_to_ones
@@ -324,10 +316,6 @@ class TorchSTFT:
         spec_harm, spec_perc, _, _ = hpss(spec)
         return torch.einsum("cf,...ft->...ct", self.chromafilter.to(spec.device), spec_harm), spec_harm, spec_perc
     
-    """def chroma(self, spec):
-        spec_harm, spec_perc, _, _ = hpss(spec)
-        return torch.einsum("cf,...ft->...ct", self.chromafilter.to(spec.device), spec_harm), spec_harm, spec_perc"""
-    
     def amp2db(self, amp):
         return Fa.amplitude_to_DB(amp, 20, amin=1e-05, db_multiplier=0)
 
@@ -343,7 +331,6 @@ class TorchSTFT:
     def transform(self, sound, param=None):
         stft = self.stft(sound)
         if self.cfg.complex:
-            #print(stft.shape)
             *other, C, F, T = stft.shape
             transformed = torch.view_as_real(stft.reshape(-1, C, F, T)).permute(0, 1, 4, 2, 3).reshape(*other, C * 2, F, T)
             return transformed
@@ -354,21 +341,6 @@ class TorchSTFT:
                 transformed = torch.matmul(self.melfilter.to(transformed.device), transformed)
             if self.cfg.db:
                 transformed = Fa.amplitude_to_DB(transformed, 20, amin=1e-05, db_multiplier=0)
-        """
-        if param is None:
-            transformed, max, min = self.normalize(transformed) #正規化
-            params = torch.stack([max, min], dim=0)
-        else:
-            # instはmixのmax,minの値で正規化する
-            transformed_list = []
-            for i in range(len(self.cfg.inst_list)):
-                #print(transformed_n.shape)
-                transformed_per, _, _ = self.normalize(transformed[:,i], max=param[0], min=param[1]) #正規化
-                transformed_list.append(transformed_per)
-            transformed = torch.stack(transformed_list, dim=1)
-            params = param
-        """
-        #return params, transformed, phase
         return transformed, phase
     
     def db2amp(self, spec):
@@ -441,17 +413,8 @@ def evaluate(reference, estimate, inst_list, writer, epoch):
         score = museval.evaluate(references=reference[:,:,idx*S:(idx+1)*S], estimates=estimate[:,:,idx*S:(idx+1)*S])
         #print(score)
         for i,key in enumerate(list(scores[inst].keys())):
-            #print(score[i].shape)
             scores[inst][key] = np.mean(score[i])
-    # print nicely formatted and aggregated scores
-    sdr="SDR"; isr="ISR"; sir="SIR"; sar="SAR"
     return scores
-    """for inst in inst_list:
-        writer.add_scalar(f"{sdr}/Test", scores[inst][sdr], global_step=epoch)
-        writer.add_scalar(f"{isr}/Test", scores[inst][isr], global_step=epoch)
-        writer.add_scalar(f"{sir}/Test", scores[inst][sir], global_step=epoch)
-        writer.add_scalar(f"{sar}/Test", scores[inst][sar], global_step=epoch)
-        print(f"{inst:<10}- SDR: {scores[inst][sdr]:.3f}, ISR: {scores[inst][isr]:.3f}, SIR: {scores[inst][sir]:.3f}, SAR: {scores[inst][sar]:.3f}")"""
 
 def knn_psd(label:np.ndarray, vec:np.ndarray, cfg, psd: bool):
     knn_start = start()
@@ -466,8 +429,6 @@ def knn_psd(label:np.ndarray, vec:np.ndarray, cfg, psd: bool):
         else: # 擬似楽曲でない曲の時
             knn_sk.fit(np.delete(vec, idx, axis=0), np.delete(label[:,0], idx, axis=0)) # 推測するsegのみ削除する。
         pred = knn_sk.predict(vec[idx].reshape(1, -1))
-        #print(label[idx], pred)
-        #print(f"{inst:<10}: {metrics.accuracy_score([info_list[idx]], pred)}%")
         if label[idx,0] == pred:
             correct_all += 1
         total_all += 1
@@ -484,26 +445,16 @@ def tsne_psd(label:np.ndarray, vec:np.ndarray, mode: str, cfg, dir_path:str, cur
     num_continue = 10
     markers = [",", "o", "v", "^", "p", "D", "<", ">", "8", "*"]
     colors = ["r", "g", "b", "c", "m", "y", "k", "#ffa500", "#00ff00", "gray"]
-    #cmap = plt.cm.get_cmap("tab20")
-    #label20 = []
     num_songs = 10
     color10 = []
     marker10 = []
-    #label_picked = []
     vec10 = []
     id_all = np.unique(label[:, 0])
     #while counter < num_songs:
     for n, picked_id in enumerate(id_all):
-        #pick_label = np.random.choice(label[:,0])
-        #if num_continue > 500:
-        #    break
-        #if picked_id in label_picked:
-        #    num_continue += 1
-        #    continue
         samesong_idx = np.where(label[:,0]==picked_id)[0]
         samesong_vec = vec[samesong_idx]
         samesong_label = label[samesong_idx]
-        #label20.append(label[samesong_idx])
         # 色を指定
         color10 = color10 + [colors[n] for i in range(samesong_idx.shape[0])]
         # マークを指定
@@ -515,9 +466,6 @@ def tsne_psd(label:np.ndarray, vec:np.ndarray, mode: str, cfg, dir_path:str, cur
                 counter_m += 1
             marker10.append(markers[counter_m])
         vec10.append(samesong_vec)
-        #label_picked.append(picked_id)
-        #counter += 1
-    #color20 = np.concatenate(color20, axis=0)
     vec10 = np.concatenate(vec10, axis=0)
     perplexity = [5, 15, 30, 50]
     for i in range(len(perplexity)):
@@ -525,7 +473,6 @@ def tsne_psd(label:np.ndarray, vec:np.ndarray, mode: str, cfg, dir_path:str, cur
         X_reduced = TSNE(n_components=2, random_state=0, perplexity=perplexity[i], n_jobs=cfg.num_workers).fit_transform(vec10)
         for j in range(len(vec10)):
             mappable = ax.scatter(X_reduced[j, 0], X_reduced[j, 1], c=color10[j], marker=marker10[j], s=30)
-        #fig.colorbar(mappable, norm=BoundaryNorm(bounds,cmap.N))
         file_exist(dir_path)
         fig.savefig(dir_path + f"/psd_emb_{mode}_e{current_epoch}_s{counter}_tsne_p{perplexity[i]}_m{cfg.margin}.png")
         plt.clf()
@@ -537,60 +484,26 @@ def tsne_psd(label:np.ndarray, vec:np.ndarray, mode: str, cfg, dir_path:str, cur
 def tsne_not_psd(label:np.ndarray, vec:np.ndarray, mode: str, cfg, dir_path:str, current_epoch=0):
     tsne_start = start()
     print(f"= T-SNE...")
-    #counter = 0
-    #num_continue = 10
-    markers = [",", "o", "v", "^", "p", "D", "<", ">", "8", "*"]
-    #colors = ["r", "g", "b", "c", "m", "y", "k", "#ffa500", "#00ff00", "gray"]
-    #colors = cm.tab20
-    #cmap = plt.cm.get_cmap("tab20")
-    #label20 = []
-    #num_songs = cfg.n_song_test
     num_songs = 20 if cfg.n_song_test >= 20 else cfg.n_song_test
     color10 = []
-
-    marker10 = []
-    label_picked = []
     vec10 = []
     id_all = np.unique(label[:, 0])
     id_picked = np.random.choice(id_all, num_songs, replace=False)
-    #while counter <= num_songs:
     for n, picked_id in enumerate(id_picked):
-        #pick_label = np.random.choice(label[:,0])
-        #if num_continue > 500:
-        #    break
-        #if pick_label in label_picked:
-        #    num_continue += 1
-        #    continue
         samesong_idx = np.where(label[:,0]==picked_id)[0]
         samesong_vec = vec[samesong_idx]
-        samesong_label = label[samesong_idx]
-        #label20.append(label[samesong_idx])
         # 色を指定
         color10 = color10 + [n for _ in range(samesong_idx.shape[0])] # 色番号のみ格納
         # マークを指定
-        """counter_m = -1 # 便宜上。本当は0にしたい
-        log_ver = []
-        for i in range(samesong_idx.shape[0]):
-            if not samesong_label[i, 1] in log_ver:
-                log_ver.append(samesong_label[i, 1])
-                counter_m += 1
-            marker10.append(markers[counter_m])"""
         vec10.append(samesong_vec)
-        #label_picked.append(picked_id)
-        #counter += 1
-    #color20 = np.concatenate(color20, axis=0)
     vec10 = np.concatenate(vec10, axis=0)
     perplexity = [5, 15, 30, 50]
     for i in range(len(perplexity)):
         fig, ax = plt.subplots(1, 1)
         X_reduced = TSNE(n_components=2, random_state=0, perplexity=perplexity[i], n_jobs=cfg.num_workers).fit_transform(vec10)
-        #for j in range(len(vec10)):
-        #    mappable = ax.scatter(X_reduced[j, 0], X_reduced[j, 1], color=cm.tab20(color10[j]), s=30, cmap="tab20")
         mappable = ax.scatter(X_reduced[:, 0], X_reduced[:, 1], c=color10, s=30, cmap="tab20")
-        #fig.colorbar(mappable, norm=BoundaryNorm(bounds,cmap.N))
         ax.legend(mappable.legend_elements(num=num_songs)[0], id_picked, borderaxespad=0, bbox_to_anchor=(1.05, 1),
                     loc="upper left", title="Songs")
-        #ax.add_artist(legend1)
         file_exist(dir_path)
         fig.savefig(dir_path + f"/not_psd_emb_{mode}_e{current_epoch}_s{num_songs}_tsne_p{perplexity[i]}_m{cfg.margin}.png", bbox_inches='tight')
         plt.clf()
@@ -604,16 +517,8 @@ def tsne_psd_marker(label:np.ndarray, vec:np.ndarray, mode: str, cfg, dir_path:s
     tsne_start = start()
     print(f"= T-SNE...")
     counter = 0
-    num_continue = 10
     markers = [",", "o", "v", "^", "p", "D", "<", ">", "8", "*"]
     colors = ["r", "g", "b", "c", "m", "y", "k", "#ffa500", "#00ff00", "gray"]
-    #cmap = plt.cm.get_cmap("tab20")
-    #label20 = []
-    num_songs = 10
-    color10 = []
-    marker10 = []
-    label_picked = []
-    vec10 = []
     id_list = []
     ver_list = []
     for id in label[:,0]:
@@ -622,16 +527,12 @@ def tsne_psd_marker(label:np.ndarray, vec:np.ndarray, mode: str, cfg, dir_path:s
     for ver in label[:,1]:
         if not ver in ver_list:
             ver_list.append(ver)
-            
-    #color20 = np.concatenate(color20, axis=0)
-    #vec10 = np.concatenate(vec10, axis=0)
     perplexity = [5, 15, 30, 50]
     for i in range(len(perplexity)):
         fig, ax = plt.subplots(1, 1)
         X_reduced = TSNE(n_components=2, random_state=0, perplexity=perplexity[i], n_jobs=cfg.num_workers).fit_transform(vec)
         for j in range(len(vec)):
             mappable = ax.scatter(X_reduced[j, 0], X_reduced[j, 1], c=colors[id_list.index(label[j,0])], marker=markers[ver_list.index(label[j,1])], s=30)
-        #fig.colorbar(mappable, norm=BoundaryNorm(bounds,cmap.N))
         file_exist(dir_path)
         fig.savefig(dir_path + f"/emb_{mode}_e{current_epoch}_s{counter}_tsne_p{perplexity[i]}_m{cfg.margin}.png")
         plt.clf()
