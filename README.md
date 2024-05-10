@@ -1,6 +1,7 @@
 <p style="display: inline">
   <img alt="Static Badge" src="https://img.shields.io/badge/Python-3.10.9-yellow?logo=python">
   <img alt="Static Badge" src="https://img.shields.io/badge/Pytorch-1.12.1-blue?logo=pytorch">
+  <img alt="Static Badge" src="https://img.shields.io/badge/Numpy-1.24.3-red?logo=numpy">
 </p>
 
 # Cascade
